@@ -8,8 +8,7 @@ export default function Home() {
         <p className={styles.kicker}>Electricity Maps</p>
         <h1 className={styles.title}>Grid carbon intensity</h1>
         <p className={styles.lede}>
-          Next.js app with Postgres, Redis, and Docker wired for the Electricity
-          Maps API. Use{" "}
+          Next.js app with Postgres, Redis, and the Electricity Maps API. Use{" "}
           <code className={styles.code}>/api/health</code> to verify services.
         </p>
         <div className={styles.actions}>
