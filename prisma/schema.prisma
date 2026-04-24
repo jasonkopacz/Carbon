@@ -1,0 +1,17 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model GridSnapshot {
+  id        String   @id @default(cuid())
+  zoneKey   String
+  payload   Json
+  fetchedAt DateTime @default(now())
+
+  @@index([zoneKey, fetchedAt])
+}
