@@ -1,0 +1,47 @@
+.main {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.card {
+  width: min(36rem, 100%);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: linear-gradient(165deg, var(--panel), #0e141c);
+  padding: 2rem;
+}
+
+.kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 650;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.back {
+  display: inline-flex;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.back:hover {
+  text-decoration: underline;
+}
