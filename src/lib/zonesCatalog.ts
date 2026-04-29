@@ -44,6 +44,10 @@ export function flattenZonesCatalog(
   return out;
 }
 
+function normalize(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function searchHaystack(z: ZoneSearchResult): string {
   const parts = [
     z.zoneKey,
@@ -51,12 +55,12 @@ function searchHaystack(z: ZoneSearchResult): string {
     z.countryName,
     z.displayName,
   ].filter(Boolean) as string[];
-  return parts.join(" ").toLowerCase();
+  return normalize(parts.join(" "));
 }
 
 function rankMatch(z: ZoneSearchResult, needle: string): number {
-  const k = z.zoneKey.toLowerCase();
-  const n = z.zoneName.toLowerCase();
+  const k = normalize(z.zoneKey);
+  const n = normalize(z.zoneName);
   if (k === needle) {
     return 0;
   }
@@ -74,7 +78,7 @@ export function searchZones(
   query: string,
   limit: number,
 ): ZoneSearchResult[] {
-  const needle = query.trim().toLowerCase();
+  const needle = normalize(query.trim());
   if (needle.length < 2) {
     return [];
   }
