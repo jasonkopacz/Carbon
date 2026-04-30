@@ -27,6 +27,8 @@ declare module "react-simple-maps" {
     onMoveStart?: (pos: { coordinates: [number, number]; zoom: number }) => void;
     onMove?: (pos: { x: number; y: number; zoom: number; dragging: boolean }) => void;
     onMoveEnd?: (pos: { coordinates: [number, number]; zoom: number }) => void;
+    // Return false to suppress an event (e.g. block wheel scroll zoom)
+    filterZoomEvent?: (event: Event) => boolean;
     children?: ReactNode;
   }
   export const ZoomableGroup: (props: ZoomableGroupProps) => JSX.Element;

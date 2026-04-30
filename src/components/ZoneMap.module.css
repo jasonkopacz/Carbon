@@ -5,7 +5,44 @@
   border-radius: 12px;
   overflow: hidden;
   background: #060b10;
-  min-height: 520px;
+  /* Fill whatever height the parent gives */
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── Zoom controls ──────────────────────────────────────────────────────────── */
+.controls {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ctrlBtn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 25, 36, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ctrlBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(61, 220, 151, 0.08);
 }
 
 /* Target only the ComposableMap's direct div wrapper, not siblings like tooltip */
