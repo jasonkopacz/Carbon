@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ComposableMap,
@@ -174,6 +174,19 @@ export function ZoneMap() {
     [router],
   );
 
+  const showTooltipAtElement = useCallback(
+    (el: Element, key: string, intensity: number | null) => {
+      const rect = el.getBoundingClientRect();
+      setTooltip({
+        x: rect.left + rect.width / 2,
+        y: rect.top,
+        key,
+        intensity,
+      });
+    },
+    [],
+  );
+
   return (
     <div className={styles.wrap}>
       {loading && (
@@ -260,8 +273,24 @@ export function ZoneMap() {
                   onMouseLeave={() => setTooltip(null)}
                   style={{ cursor: "pointer" }}
                 >
-                  <circle r={r * 2.2} fill={color} opacity={0.15} />
-                  <circle r={r} fill={color} stroke="#060b10" strokeWidth={0.8} />
+                  <g
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${getZoneName(key)} (${key}), ${status?.intensity == null ? "no live data" : `${status.intensity} grams CO2 per kilowatt-hour`}`}
+                    onFocus={(e: FocusEvent<SVGGElement>) => {
+                      showTooltipAtElement(e.currentTarget, key, status?.intensity ?? null);
+                    }}
+                    onBlur={() => setTooltip(null)}
+                    onKeyDown={(e: KeyboardEvent<SVGGElement>) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleMarkerClick(key);
+                      }
+                    }}
+                  >
+                    <circle r={r * 2.2} fill={color} opacity={0.15} />
+                    <circle r={r} fill={color} stroke="#060b10" strokeWidth={0.8} />
+                  </g>
                 </Marker>
               );
             })}

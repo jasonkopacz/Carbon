@@ -26,6 +26,7 @@ export function ZoneSearch() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  const [searchNonce, setSearchNonce] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function ZoneSearch() {
       window.clearTimeout(tid);
       ac.abort();
     };
-  }, [query]);
+  }, [query, searchNonce]);
 
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
@@ -149,7 +150,22 @@ export function ZoneSearch() {
         {loading ? <span className={styles.spinner} aria-label="Loading" /> : null}
       </div>
       <p className={styles.hint}>Type at least two characters. Results match zone name, country, or code.</p>
-      {error ? <p className={styles.error}>{error}</p> : null}
+      {error ? (
+        <div className={styles.errorRow}>
+          <p className={styles.error}>{error}</p>
+          <button
+            type="button"
+            className={styles.retryBtn}
+            onClick={() => {
+              if (query.trim().length >= 2) {
+                setSearchNonce((n) => n + 1);
+              }
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
       {open && query.trim().length >= 2 && !loading ? (
         <div
           id="zone-search-listbox"

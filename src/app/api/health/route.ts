@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 
 export async function GET() {
-  console.log("[api/health] GET");
+  if (process.env.NODE_ENV === "development") {
+    console.log("[api/health] GET");
+  }
   const checks: Record<string, string> = {};
   try {
     await prisma.$queryRaw`SELECT 1`;
