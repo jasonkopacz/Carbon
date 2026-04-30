@@ -10,6 +10,7 @@ import {
   ZoomableGroup,
 } from "react-simple-maps";
 import zoneNamesJson from "@/lib/zone_names.json";
+import { intensityColor, intensityLabel } from "@/lib/intensity";
 import styles from "./ZoneMap.module.css";
 
 const GEO_URL  = "/countries-110m.json";
@@ -64,24 +65,6 @@ const ZONE_CENTROIDS: Record<string, [number, number]> = {
   "NO-NO4":[17.0,68.0],"NO-NO5":[6.0,62.0],
 };
 
-// ── Intensity helpers ─────────────────────────────────────────────────────────
-function intensityColor(v: number | null) {
-  if (v == null) return "#374151";
-  if (v < 100)  return "#3ddc97";
-  if (v < 200)  return "#7bdf5a";
-  if (v < 350)  return "#f5c842";
-  if (v < 500)  return "#f58642";
-  return "#f54242";
-}
-function intensityLabel(v: number | null) {
-  if (v == null) return "No data";
-  if (v < 100)  return "Very low";
-  if (v < 200)  return "Low";
-  if (v < 350)  return "Moderate";
-  if (v < 500)  return "High";
-  return "Very high";
-}
-
 // Cubic ease-out
 function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
@@ -105,14 +88,27 @@ export function ZoneMap() {
   const [zones,    setZones]    = useState<Record<string, ZoneData>>({});
   const [loading,  setLoading]  = useState(true);
   const [progress, setProgress] = useState(0);
+  const [fetchError, setFetchError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [tooltip,  setTooltip]  = useState<TooltipSt | null>(null);
 
   // ── Data fetch — single bulk request instead of 70+ individual calls ─────
   useEffect(() => {
     let cancelled = false;
+    const ac = new AbortController();
+    const timeoutId = setTimeout(() => ac.abort(), 15_000);
+
     setProgress(30); // show immediate progress while waiting
-    fetch("/api/zones/intensity/bulk")
-      .then((r) => r.json())
+    setFetchError(false);
+    setZones({});
+
+    fetch("/api/zones/intensity/bulk", { signal: ac.signal })
+      .then((r) => {
+        if (!r.ok) {
+          throw new Error(`Bulk fetch failed: ${r.status}`);
+        }
+        return r.json() as Promise<Record<string, number | null>>;
+      })
       .then((data: Record<string, number | null>) => {
         if (cancelled) return;
         const mapped: Record<string, ZoneData> = {};
@@ -124,10 +120,19 @@ export function ZoneMap() {
         setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
+        if (cancelled) return;
+        setZones({});
+        setFetchError(true);
+        setLoading(false);
+      })
+      .finally(() => clearTimeout(timeoutId));
+
+    return () => {
+      cancelled = true;
+      ac.abort();
+      clearTimeout(timeoutId);
+    };
+  }, [retryCount]);
 
   // ── Smooth button zoom via RAF + cubic ease-out ───────────────────────────
   function animateTo(target: number) {
@@ -178,6 +183,20 @@ export function ZoneMap() {
             <div className={styles.progressBar}>
               <div className={styles.progressFill} style={{ width: `${progress}%` }} />
             </div>
+          </div>
+        </div>
+      )}
+      {fetchError && !loading && (
+        <div className={styles.loadingOverlay}>
+          <div className={styles.loadingInner}>
+            <span className={styles.loadingText}>Failed to load intensity data.</span>
+            <button
+              className={styles.ctrlBtn}
+              style={{ marginTop: "0.75rem" }}
+              onClick={() => { setFetchError(false); setLoading(true); setProgress(0); setRetryCount((n) => n + 1); }}
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}

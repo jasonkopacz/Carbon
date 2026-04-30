@@ -106,7 +106,6 @@ const POPULAR_ZONES = [
 ];
 
 export default function Home() {
-  console.log("[page] Home render");
   return (
     <div className={styles.page}>
       <EnergyGrid />

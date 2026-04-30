@@ -1,7 +1,7 @@
 import { redis } from "./redis";
 
 export async function getCacheJson<T>(key: string): Promise<T | null> {
-  console.log("[cache] get", { key });
+  if (process.env.NODE_ENV === "development") console.log("[cache] get", { key });
   const raw = await redis.get(key);
   if (raw == null) {
     return null;
@@ -14,6 +14,6 @@ export async function setCacheJson(
   value: unknown,
   ttlSeconds: number,
 ) {
-  console.log("[cache] set", { key, ttlSeconds });
+  if (process.env.NODE_ENV === "development") console.log("[cache] set", { key, ttlSeconds });
   await redis.set(key, JSON.stringify(value), "EX", ttlSeconds);
 }

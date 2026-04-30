@@ -21,8 +21,10 @@ export function saveRecentZone(key: string, name: string) {
       ...filtered,
     ].slice(0, MAX_RECENT);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch {
-    // localStorage unavailable
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[ZoneTracker] failed to save recent zone", { error: String(error) });
+    }
   }
 }
 
@@ -30,7 +32,10 @@ export function getRecentZones(): RecentZone[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[ZoneTracker] failed to read recent zones", { error: String(error) });
+    }
     return [];
   }
 }

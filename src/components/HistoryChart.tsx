@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { CarbonIntensityHistoryPoint } from "@/lib/electricityMaps";
+import { intensityColor } from "@/lib/intensity";
 import styles from "./HistoryChart.module.css";
 
 const BEST_THRESHOLD = 150; // gCO₂eq/kWh — shade green below this
@@ -11,18 +12,11 @@ interface Props {
   forecast?: CarbonIntensityHistoryPoint[];
 }
 
-function intensityColor(v: number): string {
-  if (v < 100) return "#3ddc97";
-  if (v < 200) return "#7bdf5a";
-  if (v < 350) return "#f5c842";
-  if (v < 500) return "#f58642";
-  return "#f54242";
-}
+const PAD = { top: 14, right: 10, bottom: 26, left: 46 };
 
 export function HistoryChart({ history, forecast }: Props) {
   const W = 800;
   const H = 140;
-  const PAD = { top: 14, right: 10, bottom: 26, left: 46 };
 
   const data = useMemo(() => {
     const histPts = history.slice(-24);

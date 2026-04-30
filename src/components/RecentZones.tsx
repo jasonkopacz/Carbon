@@ -11,7 +11,10 @@ function getFavoriteKeys(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[RecentZones] failed to read favorites", { error: String(error) });
+    }
     return [];
   }
 }

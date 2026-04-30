@@ -9,8 +9,10 @@ export async function getApiToken(): Promise<string | undefined> {
     const jar = await cookies();
     const cookieToken = jar.get("em_token")?.value;
     if (cookieToken) return cookieToken;
-  } catch {
-    // cookies() throws outside request context (e.g. build time)
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[electricityMaps] cookie token unavailable", { error: String(error) });
+    }
   }
   const envToken = process.env.ELECTRICITY_MAPS_API_TOKEN;
   if (!envToken) {
@@ -26,7 +28,7 @@ function makeHeaders(token: string | undefined): HeadersInit {
 
 export function electricityMapsUrl(path: string) {
   const url = `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
-  console.log("[electricityMaps] url", { url });
+  if (process.env.NODE_ENV === "development") console.log("[electricityMaps] url", { url });
   return url;
 }
 

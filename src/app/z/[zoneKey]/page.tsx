@@ -15,6 +15,7 @@ import {
   type PowerSources,
 } from "@/lib/electricityMaps";
 import zoneNamesJson from "@/lib/zone_names.json";
+import { intensityBadge } from "@/lib/intensity";
 import styles from "./zonePage.module.css";
 import loadingStyles from "./loading.module.css";
 
@@ -39,14 +40,6 @@ function getZoneInfo(key: string) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function intensityLabel(v: number) {
-  if (v < 100) return { text: "Very Low", cls: "veryLow" };
-  if (v < 200) return { text: "Low", cls: "low" };
-  if (v < 350) return { text: "Moderate", cls: "moderate" };
-  if (v < 500) return { text: "High", cls: "high" };
-  return { text: "Very High", cls: "veryHigh" };
-}
 
 function fmtMW(mw: number | null): string {
   if (mw == null) return "—";
@@ -164,7 +157,7 @@ async function ZoneDataSection({ zoneKey, token }: { zoneKey: string; token: str
   ]);
 
   const { displayName, countryName } = getZoneInfo(zoneKey);
-  const label = ci ? intensityLabel(ci.carbonIntensity) : null;
+  const label = ci ? intensityBadge(ci.carbonIntensity) : null;
 
   return (
     <main className={styles.main}>

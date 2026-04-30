@@ -53,9 +53,7 @@ export function ZoneSearch() {
         if (!res.ok) {
           throw new Error(body.error ?? "Search failed");
         }
-        console.log("[ZoneSearch] results", {
-          count: body.zones?.length ?? 0,
-        });
+        if (process.env.NODE_ENV === "development") console.log("[ZoneSearch] results", { count: body.zones?.length ?? 0 });
         setResults(body.zones ?? []);
         setOpen(true);
         setActive(-1);
@@ -87,7 +85,7 @@ export function ZoneSearch() {
 
   const pick = useCallback(
     (z: ZoneRow) => {
-      console.log("[ZoneSearch] pick", { zoneKey: z.zoneKey });
+      if (process.env.NODE_ENV === "development") console.log("[ZoneSearch] pick", { zoneKey: z.zoneKey });
       setQuery(primaryLabel(z));
       setOpen(false);
       router.push(`/z/${encodeURIComponent(z.zoneKey)}`);

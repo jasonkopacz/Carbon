@@ -9,7 +9,10 @@ function getFavorites(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[FavoriteButton] failed to read favorites", { error: String(error) });
+    }
     return [];
   }
 }
@@ -17,8 +20,10 @@ function getFavorites(): string[] {
 function setFavorites(keys: string[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
-  } catch {
-    // ignore
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[FavoriteButton] failed to write favorites", { error: String(error) });
+    }
   }
 }
 
@@ -28,11 +33,12 @@ interface Props {
 }
 
 export function FavoriteButton({ zoneKey, zoneName }: Props) {
-  const [isFav, setIsFav] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [isFav, setIsFav] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return getFavorites().includes(zoneKey);
+  });
 
   useEffect(() => {
-    setMounted(true);
     setIsFav(getFavorites().includes(zoneKey));
   }, [zoneKey]);
 
@@ -49,8 +55,6 @@ export function FavoriteButton({ zoneKey, zoneName }: Props) {
     // Dispatch so other components (homepage) can react
     window.dispatchEvent(new Event("carbon:favorites-changed"));
   }
-
-  if (!mounted) return null;
 
   return (
     <button
