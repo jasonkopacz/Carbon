@@ -1,13 +1,26 @@
+import { cookies } from "next/headers";
+
 const BASE = "https://api.electricitymaps.com/v3";
 
-export function electricityMapsHeaders(): HeadersInit {
-  const token = process.env.ELECTRICITY_MAPS_API_TOKEN;
-  if (!token) {
-    console.warn(
-      "[electricityMaps] ELECTRICITY_MAPS_API_TOKEN is not set; authenticated requests will fail",
-    );
-    return {};
+// Call this ONCE per request (top of a server component) to avoid multiple
+// concurrent cookies() reads, which breaks React 19 Suspense streaming.
+export async function getApiToken(): Promise<string | undefined> {
+  try {
+    const jar = await cookies();
+    const cookieToken = jar.get("em_token")?.value;
+    if (cookieToken) return cookieToken;
+  } catch {
+    // cookies() throws outside request context (e.g. build time)
   }
+  const envToken = process.env.ELECTRICITY_MAPS_API_TOKEN;
+  if (!envToken) {
+    console.warn("[electricityMaps] no API token configured");
+  }
+  return envToken;
+}
+
+function makeHeaders(token: string | undefined): HeadersInit {
+  if (!token) return {};
   return { "auth-token": token };
 }
 
@@ -74,13 +87,18 @@ export type CarbonIntensityHistory = {
   history: CarbonIntensityHistoryPoint[];
 };
 
-// ── Fetchers ─────────────────────────────────────────────────────────────────
+export type CarbonIntensityForecast = {
+  zone: string;
+  forecast: CarbonIntensityHistoryPoint[];
+};
 
-async function emFetch<T>(path: string): Promise<T | null> {
+// ── Fetchers (all accept an explicit token) ──────────────────────────────────
+
+async function emFetch<T>(path: string, token: string | undefined): Promise<T | null> {
   try {
     const res = await fetch(electricityMapsUrl(path), {
-      headers: electricityMapsHeaders(),
-      next: { revalidate: 300 }, // 5 min cache via Next.js fetch cache
+      headers: makeHeaders(token),
+      next: { revalidate: 300 },
     });
     if (!res.ok) {
       console.error("[electricityMaps] fetch error", { path, status: res.status });
@@ -93,14 +111,30 @@ async function emFetch<T>(path: string): Promise<T | null> {
   }
 }
 
-export function getCarbonIntensity(zone: string) {
-  return emFetch<CarbonIntensityLatest>(`/carbon-intensity/latest?zone=${encodeURIComponent(zone)}`);
+export function getCarbonIntensity(zone: string, token: string | undefined) {
+  return emFetch<CarbonIntensityLatest>(
+    `/carbon-intensity/latest?zone=${encodeURIComponent(zone)}`,
+    token,
+  );
 }
 
-export function getPowerBreakdown(zone: string) {
-  return emFetch<PowerBreakdownLatest>(`/power-breakdown/latest?zone=${encodeURIComponent(zone)}`);
+export function getPowerBreakdown(zone: string, token: string | undefined) {
+  return emFetch<PowerBreakdownLatest>(
+    `/power-breakdown/latest?zone=${encodeURIComponent(zone)}`,
+    token,
+  );
 }
 
-export function getCarbonIntensityHistory(zone: string) {
-  return emFetch<CarbonIntensityHistory>(`/carbon-intensity/history?zone=${encodeURIComponent(zone)}`);
+export function getCarbonIntensityHistory(zone: string, token: string | undefined) {
+  return emFetch<CarbonIntensityHistory>(
+    `/carbon-intensity/history?zone=${encodeURIComponent(zone)}`,
+    token,
+  );
+}
+
+export function getCarbonIntensityForecast(zone: string, token: string | undefined) {
+  return emFetch<CarbonIntensityForecast>(
+    `/carbon-intensity/forecast?zone=${encodeURIComponent(zone)}`,
+    token,
+  );
 }

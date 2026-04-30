@@ -1,5 +1,6 @@
 import { ZoneSearch } from "@/components/ZoneSearch";
 import { EnergyGrid } from "@/components/EnergyGrid";
+import { RecentZones } from "@/components/RecentZones";
 import styles from "./page.module.css";
 import Link from "next/link";
 
@@ -126,6 +127,12 @@ export default function Home() {
           >
             Electricity Maps docs
           </a>
+          <Link className={styles.navLink} href="/map">
+            Global map
+          </Link>
+          <Link className={styles.navLink} href="/settings">
+            Settings
+          </Link>
         </nav>
       </header>
 
@@ -144,6 +151,7 @@ export default function Home() {
             Maps API; your token stays on the server.
           </p>
           <ZoneSearch />
+          <RecentZones />
         </section>
 
         {/* ── Stats ── */}

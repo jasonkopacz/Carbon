@@ -19,7 +19,8 @@
     "next": "^15.3.0",
     "npx": "^10.2.2",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-simple-maps": "^3.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.0",

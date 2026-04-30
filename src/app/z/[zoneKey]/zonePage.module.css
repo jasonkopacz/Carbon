@@ -20,7 +20,30 @@
   border-bottom: 1px solid var(--border);
   background: rgba(11, 15, 20, 0.85);
   backdrop-filter: blur(12px);
+  flex-wrap: wrap;
 }
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mapLink {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.mapLink:hover { color: var(--accent); }
 
 .back {
   font-size: 0.875rem;
@@ -83,6 +106,13 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.zoneName {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .updatedAt {
@@ -294,7 +324,7 @@
 
 .flowRow {
   display: grid;
-  grid-template-columns: 80px 1fr 70px;
+  grid-template-columns: 80px 1fr 64px 40px;
   align-items: center;
   gap: 0.6rem;
 }
@@ -326,6 +356,14 @@
   font-size: 0.78rem;
   color: var(--muted);
   text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.flowPct {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: right;
+  color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
 

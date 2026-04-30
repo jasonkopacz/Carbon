@@ -1,0 +1,104 @@
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+.shimmer {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--panel) 25%,
+    #1a2535 50%,
+    var(--panel) 75%
+  );
+  background-size: 1200px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 0.875rem 1.75rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(11, 15, 20, 0.85);
+}
+
+.backBtn { width: 120px; height: 20px; }
+
+.main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.kicker  { width: 90px;  height: 12px; }
+.title   { width: 220px; height: 44px; border-radius: 8px; }
+.subtitle{ width: 160px; height: 14px; }
+.badge   { width: 130px; height: 88px; border-radius: 14px; flex-shrink: 0; }
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) { .statsRow { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .statsRow { grid-template-columns: repeat(2, 1fr); } }
+
+.statCard {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.1rem 0.75rem;
+  gap: 0.5rem;
+  border-right: 1px solid var(--border);
+}
+.statCard:last-child { border-right: none; }
+
+.statValue { width: 60px;  height: 24px; border-radius: 4px; }
+.statLabel { width: 50px;  height: 11px; }
+
+.wideCard {
+  width: 100%;
+  height: 220px;
+  border-radius: 14px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  height: 260px;
+  border-radius: 14px;
+}

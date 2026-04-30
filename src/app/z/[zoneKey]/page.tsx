@@ -1,15 +1,40 @@
 import Link from "next/link";
 import { EnergyGrid } from "@/components/EnergyGrid";
 import { HistoryChart } from "@/components/HistoryChart";
+import { DonutChart } from "@/components/DonutChart";
+import { FavoriteButton } from "@/components/FavoriteButton";
+import { ZoneTracker } from "@/components/ZoneTracker";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import {
+  getApiToken,
   getCarbonIntensity,
   getPowerBreakdown,
   getCarbonIntensityHistory,
+  getCarbonIntensityForecast,
   type PowerSources,
 } from "@/lib/electricityMaps";
+import zoneNamesJson from "@/lib/zone_names.json";
 import styles from "./zonePage.module.css";
 
 type Props = { params: Promise<{ zoneKey: string }> };
+
+// ── Zone catalog lookup ───────────────────────────────────────────────────────
+
+const catalog = (
+  zoneNamesJson as {
+    zoneShortName: Record<
+      string,
+      { zoneName?: string; countryName?: string; displayName?: string }
+    >;
+  }
+).zoneShortName;
+
+function getZoneInfo(key: string) {
+  const entry = catalog[key];
+  if (!entry) return { displayName: key, countryName: null };
+  const displayName = entry.displayName ?? entry.zoneName ?? key;
+  return { displayName, countryName: entry.countryName ?? null };
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,18 +66,18 @@ const SOURCE_META: Record<
   string,
   { label: string; color: string; renewable: boolean }
 > = {
-  solar:            { label: "Solar",            color: "#fbbf24", renewable: true  },
-  wind:             { label: "Wind",             color: "#3ddc97", renewable: true  },
-  hydro:            { label: "Hydro",            color: "#60a5fa", renewable: true  },
-  "hydro discharge":{ label: "Hydro Discharge",  color: "#93c5fd", renewable: true  },
-  nuclear:          { label: "Nuclear",          color: "#a78bfa", renewable: false },
-  geothermal:       { label: "Geothermal",       color: "#fb7185", renewable: true  },
-  biomass:          { label: "Biomass",          color: "#86efac", renewable: true  },
-  gas:              { label: "Gas",              color: "#f97316", renewable: false },
-  coal:             { label: "Coal",             color: "#9ca3af", renewable: false },
-  oil:              { label: "Oil",              color: "#78350f", renewable: false },
-  "battery discharge":{ label: "Battery",        color: "#c084fc", renewable: false },
-  unknown:          { label: "Unknown",          color: "#4b5563", renewable: false },
+  solar:               { label: "Solar",           color: "#fbbf24", renewable: true  },
+  wind:                { label: "Wind",            color: "#3ddc97", renewable: true  },
+  hydro:               { label: "Hydro",           color: "#60a5fa", renewable: true  },
+  "hydro discharge":   { label: "Hydro Discharge", color: "#93c5fd", renewable: true  },
+  nuclear:             { label: "Nuclear",         color: "#a78bfa", renewable: false },
+  geothermal:          { label: "Geothermal",      color: "#fb7185", renewable: true  },
+  biomass:             { label: "Biomass",         color: "#86efac", renewable: true  },
+  gas:                 { label: "Gas",             color: "#f97316", renewable: false },
+  coal:                { label: "Coal",            color: "#9ca3af", renewable: false },
+  oil:                 { label: "Oil",             color: "#92400e", renewable: false },
+  "battery discharge": { label: "Battery",         color: "#c084fc", renewable: false },
+  unknown:             { label: "Unknown",         color: "#4b5563", renewable: false },
 };
 
 const SOURCE_ORDER = [
@@ -60,18 +85,12 @@ const SOURCE_ORDER = [
   "geothermal", "biomass", "gas", "coal", "oil", "battery discharge", "unknown",
 ];
 
-function SourceBars({
-  breakdown,
-  total,
-}: {
-  breakdown: PowerSources;
-  total: number;
-}) {
+function SourceBars({ breakdown, total }: { breakdown: PowerSources; total: number }) {
   const entries = SOURCE_ORDER.map((key) => ({
     key,
     value: breakdown[key as keyof PowerSources] ?? 0,
     meta: SOURCE_META[key] ?? { label: key, color: "#4b5563", renewable: false },
-  })).filter((e) => e.value != null && e.value > 0);
+  })).filter((e) => (e.value ?? 0) > 0);
 
   if (entries.length === 0) return <p className={styles.noData}>No data available</p>;
 
@@ -82,23 +101,12 @@ function SourceBars({
         return (
           <div key={e.key} className={styles.sourceRow}>
             <div className={styles.sourceLabel}>
-              <span
-                className={styles.sourceDot}
-                style={{ background: e.meta.color }}
-              />
+              <span className={styles.sourceDot} style={{ background: e.meta.color }} />
               <span className={styles.sourceName}>{e.meta.label}</span>
-              {e.meta.renewable && (
-                <span className={styles.renewableBadge}>↻</span>
-              )}
+              {e.meta.renewable && <span className={styles.renewableBadge}>↻</span>}
             </div>
             <div className={styles.sourceBar}>
-              <div
-                className={styles.sourceBarFill}
-                style={{
-                  width: `${pct.toFixed(1)}%`,
-                  background: e.meta.color,
-                }}
-              />
+              <div className={styles.sourceBarFill} style={{ width: `${pct.toFixed(1)}%`, background: e.meta.color }} />
             </div>
             <span className={styles.sourceValue}>{fmtMW(e.value)}</span>
             <span className={styles.sourcePct}>{pct.toFixed(1)}%</span>
@@ -114,29 +122,38 @@ function SourceBars({
 export default async function ZonePage({ params }: Props) {
   const { zoneKey: raw } = await params;
   const zoneKey = decodeURIComponent(raw);
+  const { displayName, countryName } = getZoneInfo(zoneKey);
   console.log("[zone page] render", { zoneKey });
 
-  const [ci, pb, history] = await Promise.all([
-    getCarbonIntensity(zoneKey),
-    getPowerBreakdown(zoneKey),
-    getCarbonIntensityHistory(zoneKey),
+  // Read token once — avoids multiple concurrent cookies() calls in React 19
+  const token = await getApiToken();
+  const [ci, pb, history, forecast] = await Promise.all([
+    getCarbonIntensity(zoneKey, token),
+    getPowerBreakdown(zoneKey, token),
+    getCarbonIntensityHistory(zoneKey, token),
+    getCarbonIntensityForecast(zoneKey, token),
   ]);
 
   const label = ci ? intensityLabel(ci.carbonIntensity) : null;
+  const pageTitle = displayName !== zoneKey ? `${displayName}${countryName ? `, ${countryName}` : ""}` : zoneKey;
 
   return (
     <div className={styles.page}>
       <EnergyGrid />
+      <AutoRefresh />
+      <ZoneTracker zoneKey={zoneKey} zoneName={pageTitle} />
 
       <header className={styles.header}>
-        <Link href="/" className={styles.back}>
-          ← Back to search
-        </Link>
-        {ci?.isEstimated && (
-          <span className={styles.estimatedBadge}>
-            Sandbox / estimated data
-          </span>
-        )}
+        <div className={styles.headerLeft}>
+          <Link href="/" className={styles.back}>← Back to search</Link>
+          <Link href="/map" className={styles.mapLink}>🗺 Global map</Link>
+        </div>
+        <div className={styles.headerRight}>
+          <FavoriteButton zoneKey={zoneKey} zoneName={pageTitle} />
+          {ci?.isEstimated && (
+            <span className={styles.estimatedBadge}>Sandbox / estimated data</span>
+          )}
+        </div>
       </header>
 
       <main className={styles.main}>
@@ -145,17 +162,18 @@ export default async function ZonePage({ params }: Props) {
           <div>
             <p className={styles.kicker}>Grid zone</p>
             <h1 className={styles.title}>{zoneKey}</h1>
-            {ci && (
-              <p className={styles.updatedAt}>
-                Updated {fmtTime(ci.updatedAt)}
+            {(displayName !== zoneKey || countryName) && (
+              <p className={styles.zoneName}>
+                {displayName !== zoneKey ? displayName : ""}
+                {displayName !== zoneKey && countryName ? " · " : ""}
+                {countryName ?? ""}
               </p>
             )}
+            {ci && <p className={styles.updatedAt}>Updated {fmtTime(ci.updatedAt)}</p>}
           </div>
           {ci && label && (
             <div className={`${styles.intensityBadge} ${styles[label.cls]}`}>
-              <span className={styles.intensityValue}>
-                {ci.carbonIntensity}
-              </span>
+              <span className={styles.intensityValue}>{ci.carbonIntensity}</span>
               <span className={styles.intensityUnit}>gCO₂eq/kWh</span>
               <span className={styles.intensityLabel}>{label.text}</span>
             </div>
@@ -171,46 +189,41 @@ export default async function ZonePage({ params }: Props) {
         {/* ── Summary stats ── */}
         {pb && (
           <div className={styles.statsRow}>
-            <div className={styles.statCard}>
-              <span className={styles.statValue}>{pb.renewablePercentage}%</span>
-              <span className={styles.statLabel}>Renewable</span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statValue}>{pb.fossilFreePercentage}%</span>
-              <span className={styles.statLabel}>Fossil-free</span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statValue}>{fmtMW(pb.powerConsumptionTotal)}</span>
-              <span className={styles.statLabel}>Consuming</span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statValue}>{fmtMW(pb.powerProductionTotal)}</span>
-              <span className={styles.statLabel}>Producing</span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statValue}>{fmtMW(pb.powerImportTotal)}</span>
-              <span className={styles.statLabel}>Importing</span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statValue}>{fmtMW(pb.powerExportTotal)}</span>
-              <span className={styles.statLabel}>Exporting</span>
-            </div>
+            {[
+              { value: `${pb.renewablePercentage}%`,       label: "Renewable"  },
+              { value: `${pb.fossilFreePercentage}%`,      label: "Fossil-free"},
+              { value: fmtMW(pb.powerConsumptionTotal),    label: "Consuming"  },
+              { value: fmtMW(pb.powerProductionTotal),     label: "Producing"  },
+              { value: fmtMW(pb.powerImportTotal),         label: "Importing"  },
+              { value: fmtMW(pb.powerExportTotal),         label: "Exporting"  },
+            ].map((s) => (
+              <div key={s.label} className={styles.statCard}>
+                <span className={styles.statValue}>{s.value}</span>
+                <span className={styles.statLabel}>{s.label}</span>
+              </div>
+            ))}
           </div>
         )}
 
         <div className={styles.grid}>
-          {/* ── 24h history ── */}
-          {history && history.history.length > 0 && (
+          {/* ── Combined history + forecast chart ── */}
+          {(history?.history.length ?? 0) > 0 && (
             <section className={`${styles.card} ${styles.cardWide}`}>
-              <h2 className={styles.cardTitle}>24-hour carbon intensity</h2>
-              <HistoryChart history={history.history} />
+              <h2 className={styles.cardTitle}>
+                Carbon intensity — past 24h
+                {forecast?.forecast.length ? " + forecast" : ""}
+              </h2>
+              <HistoryChart
+                history={history!.history}
+                forecast={forecast?.forecast}
+              />
               <div className={styles.historyLegend}>
                 {[
-                  { label: "Very Low", color: "#3ddc97", range: "< 100" },
-                  { label: "Low",      color: "#7bdf5a", range: "100–200" },
-                  { label: "Moderate", color: "#f5c842", range: "200–350" },
-                  { label: "High",     color: "#f58642", range: "350–500" },
-                  { label: "Very High",color: "#f54242", range: "> 500" },
+                  { label: "Very Low",  color: "#3ddc97", range: "< 100"   },
+                  { label: "Low",       color: "#7bdf5a", range: "100–200" },
+                  { label: "Moderate",  color: "#f5c842", range: "200–350" },
+                  { label: "High",      color: "#f58642", range: "350–500" },
+                  { label: "Very High", color: "#f54242", range: "> 500"   },
                 ].map((l) => (
                   <span key={l.label} className={styles.legendItem}>
                     <span className={styles.legendDot} style={{ background: l.color }} />
@@ -221,14 +234,22 @@ export default async function ZonePage({ params }: Props) {
             </section>
           )}
 
+          {/* ── Energy mix donut ── */}
+          {pb && (
+            <section className={styles.card}>
+              <h2 className={styles.cardTitle}>Energy mix</h2>
+              <DonutChart
+                breakdown={pb.powerConsumptionBreakdown}
+                total={pb.powerConsumptionTotal}
+              />
+            </section>
+          )}
+
           {/* ── Consumption breakdown ── */}
           {pb && (
             <section className={styles.card}>
               <h2 className={styles.cardTitle}>Power consumption by source</h2>
-              <SourceBars
-                breakdown={pb.powerConsumptionBreakdown}
-                total={pb.powerConsumptionTotal}
-              />
+              <SourceBars breakdown={pb.powerConsumptionBreakdown} total={pb.powerConsumptionTotal} />
             </section>
           )}
 
@@ -236,10 +257,7 @@ export default async function ZonePage({ params }: Props) {
           {pb && (
             <section className={styles.card}>
               <h2 className={styles.cardTitle}>Power production by source</h2>
-              <SourceBars
-                breakdown={pb.powerProductionBreakdown}
-                total={pb.powerProductionTotal}
-              />
+              <SourceBars breakdown={pb.powerProductionBreakdown} total={pb.powerProductionTotal} />
             </section>
           )}
 
@@ -252,19 +270,13 @@ export default async function ZonePage({ params }: Props) {
                   .sort(([, a], [, b]) => b - a)
                   .map(([zone, mw]) => (
                     <div key={zone} className={styles.flowRow}>
-                      <Link href={`/z/${encodeURIComponent(zone)}`} className={styles.flowZone}>
-                        {zone}
-                      </Link>
+                      <Link href={`/z/${encodeURIComponent(zone)}`} className={styles.flowZone}>{zone}</Link>
                       <div className={styles.flowBar}>
-                        <div
-                          className={styles.flowBarFill}
-                          style={{
-                            width: `${((mw / pb.powerImportTotal) * 100).toFixed(1)}%`,
-                            background: "#60a5fa",
-                          }}
-                        />
+                        <div className={styles.flowBarFill}
+                          style={{ width: `${((mw / pb.powerImportTotal) * 100).toFixed(1)}%`, background: "#60a5fa" }} />
                       </div>
                       <span className={styles.flowValue}>{fmtMW(mw)}</span>
+                      <span className={styles.flowPct}>{((mw / pb.powerImportTotal) * 100).toFixed(0)}%</span>
                     </div>
                   ))}
               </div>
@@ -280,19 +292,13 @@ export default async function ZonePage({ params }: Props) {
                   .sort(([, a], [, b]) => b - a)
                   .map(([zone, mw]) => (
                     <div key={zone} className={styles.flowRow}>
-                      <Link href={`/z/${encodeURIComponent(zone)}`} className={styles.flowZone}>
-                        {zone}
-                      </Link>
+                      <Link href={`/z/${encodeURIComponent(zone)}`} className={styles.flowZone}>{zone}</Link>
                       <div className={styles.flowBar}>
-                        <div
-                          className={styles.flowBarFill}
-                          style={{
-                            width: `${((mw / pb.powerExportTotal) * 100).toFixed(1)}%`,
-                            background: "#f97316",
-                          }}
-                        />
+                        <div className={styles.flowBarFill}
+                          style={{ width: `${((mw / pb.powerExportTotal) * 100).toFixed(1)}%`, background: "#f97316" }} />
                       </div>
                       <span className={styles.flowValue}>{fmtMW(mw)}</span>
+                      <span className={styles.flowPct}>{((mw / pb.powerExportTotal) * 100).toFixed(0)}%</span>
                     </div>
                   ))}
               </div>
@@ -304,38 +310,24 @@ export default async function ZonePage({ params }: Props) {
             <section className={styles.card}>
               <h2 className={styles.cardTitle}>Metadata</h2>
               <dl className={styles.metaList}>
-                <div className={styles.metaRow}>
-                  <dt>Zone</dt>
-                  <dd>{ci.zone}</dd>
-                </div>
-                <div className={styles.metaRow}>
-                  <dt>Measurement time</dt>
-                  <dd>{fmtTime(ci.datetime)}</dd>
-                </div>
-                <div className={styles.metaRow}>
-                  <dt>Last updated</dt>
-                  <dd>{fmtTime(ci.updatedAt)}</dd>
-                </div>
-                <div className={styles.metaRow}>
-                  <dt>Emission factor type</dt>
-                  <dd>{ci.emissionFactorType}</dd>
-                </div>
-                {ci.temporalGranularity && (
-                  <div className={styles.metaRow}>
-                    <dt>Granularity</dt>
-                    <dd>{ci.temporalGranularity}</dd>
+                {[
+                  { dt: "Zone",               dd: ci.zone                   },
+                  { dt: "Measurement time",   dd: fmtTime(ci.datetime)      },
+                  { dt: "Last updated",       dd: fmtTime(ci.updatedAt)     },
+                  { dt: "Emission factor",    dd: ci.emissionFactorType      },
+                  ...(ci.temporalGranularity
+                    ? [{ dt: "Granularity",   dd: ci.temporalGranularity }]
+                    : []),
+                  { dt: "Estimated",          dd: ci.isEstimated ? "Yes" : "No" },
+                  ...(ci.estimationMethod
+                    ? [{ dt: "Estimation method", dd: ci.estimationMethod }]
+                    : []),
+                ].map(({ dt, dd }) => (
+                  <div key={dt} className={styles.metaRow}>
+                    <dt>{dt}</dt>
+                    <dd>{dd}</dd>
                   </div>
-                )}
-                <div className={styles.metaRow}>
-                  <dt>Estimated</dt>
-                  <dd>{ci.isEstimated ? "Yes" : "No"}</dd>
-                </div>
-                {ci.estimationMethod && (
-                  <div className={styles.metaRow}>
-                    <dt>Estimation method</dt>
-                    <dd>{ci.estimationMethod}</dd>
-                  </div>
-                )}
+                ))}
               </dl>
             </section>
           )}

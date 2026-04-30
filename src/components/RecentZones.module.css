@@ -1,0 +1,80 @@
+.wrap {
+  width: min(44rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.heading {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.headingIcon {
+  color: #f5c842;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--panel);
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.82rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+  background: rgba(61, 220, 151, 0.05);
+}
+
+.favChip {
+  border-color: rgba(245, 200, 66, 0.35);
+  background: rgba(245, 200, 66, 0.05);
+}
+
+.favChip:hover {
+  border-color: #f5c842;
+  background: rgba(245, 200, 66, 0.1);
+}
+
+.chipCode {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.favChip .chipCode {
+  color: #f5c842;
+}
+
+.chipName {
+  color: var(--muted);
+}
