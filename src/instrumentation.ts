@@ -18,10 +18,15 @@ export async function register() {
     );
   }
   try {
-    const { redis } = await import("./lib/redis");
-    const pong = await redis.ping();
-    if (process.env.NODE_ENV === "development") {
-      console.log("[instrumentation] redis reachable", { pong });
+    const { getRedis } = await import("./lib/redis");
+    const redis = getRedis();
+    if (!redis) {
+      console.log("[instrumentation] redis not configured, skipping ping");
+    } else {
+      const pong = await redis.ping();
+      if (process.env.NODE_ENV === "development") {
+        console.log("[instrumentation] redis reachable", { pong });
+      }
     }
   } catch (err) {
     console.warn(

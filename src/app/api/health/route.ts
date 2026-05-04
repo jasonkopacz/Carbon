@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { redis } from "@/lib/redis";
+import { getRedis } from "@/lib/redis";
 
 export async function GET() {
   if (process.env.NODE_ENV === "development") {
@@ -13,12 +13,19 @@ export async function GET() {
   } catch {
     checks.postgres = "error";
   }
-  try {
-    const pong = await redis.ping();
-    checks.redis = pong === "PONG" ? "ok" : "unexpected";
-  } catch {
-    checks.redis = "error";
+  const redis = getRedis();
+  if (!redis) {
+    checks.redis = "skipped";
+  } else {
+    try {
+      const pong = await redis.ping();
+      checks.redis = pong === "PONG" ? "ok" : "unexpected";
+    } catch {
+      checks.redis = "error";
+    }
   }
-  const ok = checks.postgres === "ok" && checks.redis === "ok";
+  const ok =
+    checks.postgres === "ok" &&
+    (checks.redis === "ok" || checks.redis === "skipped");
   return NextResponse.json({ ok, checks }, { status: ok ? 200 : 503 });
 }
