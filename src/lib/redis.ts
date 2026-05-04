@@ -3,7 +3,6 @@ import Redis, { type RedisOptions } from "ioredis";
 const URL_ENV_KEYS = [
   "REDIS_URL",
   "KV_URL",
-  "UPSTASH_REDIS_REST_URL",
 ] as const;
 
 type RedisSingleton = Redis | null | undefined;
@@ -39,7 +38,7 @@ function tcpRedisUrlToOptions(urlStr: string): RedisOptions {
 }
 
 function isTcpRedisUrl(url: string | undefined): url is string {
-  const raw = url?.trim();
+  const raw = url?.trim().replace(/^["']|["']$/g, "");
   if (
     !raw ||
     (!raw.startsWith("redis://") && !raw.startsWith("rediss://"))
@@ -59,7 +58,7 @@ function resolveRedisUrl(): string | null {
     const raw = process.env[key];
     if (isTcpRedisUrl(raw)) {
       console.log("[redis] using TCP URL from env", { key });
-      return raw.trim();
+      return raw.trim().replace(/^["']|["']$/g, "");
     }
   }
   for (const key of URL_ENV_KEYS) {
@@ -70,14 +69,6 @@ function resolveRedisUrl(): string | null {
         { key },
       );
     }
-  }
-  if (
-    process.env.NODE_ENV === "development" &&
-    process.env.UPSTASH_REDIS_REST_URL?.trim()?.startsWith("http")
-  ) {
-    console.warn(
-      "[redis] UPSTASH_REDIS_REST_URL is REST (HTTPS); ioredis needs a URL like rediss://default:token@host:6379. Set REDIS_URL from the Upstash console, or use redis://127.0.0.1:6379 locally.",
-    );
   }
   if (process.env.NODE_ENV === "development") {
     console.log("[redis] dev fallback", { url: "redis://127.0.0.1:6379" });
