@@ -98,9 +98,16 @@ export function ZoneMap() {
     const ac = new AbortController();
     const timeoutId = setTimeout(() => ac.abort(), 15_000);
 
-    setProgress(30); // show immediate progress while waiting
+    setProgress(0);
     setFetchError(false);
     setZones({});
+
+    // Animate toward 85% while the request is in-flight.
+    // Each tick closes 8% of the remaining gap, so the bar slows
+    // naturally as it approaches the cap without ever reaching it.
+    const progressInterval = setInterval(() => {
+      setProgress((p) => p + (85 - p) * 0.08);
+    }, 150);
 
     fetch("/api/zones/intensity/bulk", { signal: ac.signal })
       .then((r) => {
@@ -111,6 +118,7 @@ export function ZoneMap() {
       })
       .then((data: Record<string, number | null>) => {
         if (cancelled) return;
+        clearInterval(progressInterval);
         const mapped: Record<string, ZoneData> = {};
         for (const key of Object.keys(ZONE_CENTROIDS)) {
           mapped[key] = { intensity: data[key] ?? null };
@@ -121,6 +129,7 @@ export function ZoneMap() {
       })
       .catch(() => {
         if (cancelled) return;
+        clearInterval(progressInterval);
         setZones({});
         setFetchError(true);
         setLoading(false);
@@ -129,6 +138,7 @@ export function ZoneMap() {
 
     return () => {
       cancelled = true;
+      clearInterval(progressInterval);
       ac.abort();
       clearTimeout(timeoutId);
     };
@@ -192,7 +202,7 @@ export function ZoneMap() {
       {loading && (
         <div className={styles.loadingOverlay}>
           <div className={styles.loadingInner}>
-            <span className={styles.loadingText}>Loading live intensities… {progress}%</span>
+            <span className={styles.loadingText}>Loading live intensities… {Math.round(progress)}%</span>
             <div className={styles.progressBar}>
               <div className={styles.progressFill} style={{ width: `${progress}%` }} />
             </div>
