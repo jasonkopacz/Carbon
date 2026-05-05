@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ComposableMap,
@@ -8,18 +8,19 @@ import {
   Geography,
   Graticule,
   Marker,
-  Sphere,
   ZoomableGroup,
 } from "react-simple-maps";
 import zoneNamesJson from "@/lib/zone_names.json";
 import { intensityColor, intensityLabel } from "@/lib/intensity";
 import styles from "./ZoneMap.module.css";
 
-const GEO_URL  = "/countries-50m.json";
+const GEO_URL  = "/countries-110m.json";
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 12;
 const ZOOM_STEP = 1.6;
 const ANIM_MS   = 320; // button zoom animation duration
+const DEBUG_PERF = process.env.NODE_ENV !== "production";
+const SHOW_GRATICULE = false;
 
 // ── Zone catalog ──────────────────────────────────────────────────────────────
 const catalog = (
@@ -66,6 +67,7 @@ const ZONE_CENTROIDS: Record<string, [number, number]> = {
   "NO-NO1":[10.0,59.5],"NO-NO2":[7.0,60.5],"NO-NO3":[11.0,63.5],
   "NO-NO4":[17.0,68.0],"NO-NO5":[6.0,62.0],
 };
+const ZONE_KEYS = Object.keys(ZONE_CENTROIDS);
 
 // Cubic ease-out
 function easeOutCubic(t: number) {
@@ -74,6 +76,107 @@ function easeOutCubic(t: number) {
 
 type ZoneData  = { intensity: number | null };
 type TooltipSt = { x: number; y: number; key: string; intensity: number | null };
+
+type MapLayerProps = {
+  zoom: number;
+  center: [number, number];
+  zones: Record<string, ZoneData>;
+  reducedMotion: boolean;
+  onMoveEnd: ({ coordinates, zoom: z }: { coordinates: [number, number]; zoom: number }) => void;
+  onMarkerClick: (key: string) => void;
+  onMarkerMouseEnter: (key: string, intensity: number | null, x: number, y: number) => void;
+  onMarkerMouseMove: (key: string, intensity: number | null, x: number, y: number) => void;
+  onMarkerMouseLeave: () => void;
+  onMarkerFocus: (el: Element, key: string, intensity: number | null) => void;
+  onMarkerBlur: () => void;
+};
+
+const MapLayers = memo(function MapLayers({
+  zoom,
+  center,
+  zones,
+  reducedMotion,
+  onMoveEnd,
+  onMarkerClick,
+  onMarkerMouseEnter,
+  onMarkerMouseMove,
+  onMarkerMouseLeave,
+  onMarkerFocus,
+  onMarkerBlur,
+}: MapLayerProps) {
+  return (
+    <ZoomableGroup
+      zoom={zoom}
+      center={center}
+      minZoom={MIN_ZOOM}
+      maxZoom={MAX_ZOOM}
+      onMoveEnd={onMoveEnd}
+    >
+      {SHOW_GRATICULE && <Graticule stroke="rgba(255,255,255,0.03)" strokeWidth={0.4} />}
+      <Geographies geography={GEO_URL}>
+        {({ geographies }) =>
+          geographies.map((geo) => (
+            <Geography
+              key={geo.rsmKey}
+              geography={geo}
+              fill="#0d2540"
+              stroke="#1a4060"
+              strokeWidth={0.5}
+              pointerEvents="none"
+              style={{
+                default: { outline: "none" },
+                hover:   { outline: "none" },
+                pressed: { outline: "none" },
+              }}
+            />
+          ))
+        }
+      </Geographies>
+
+      {ZONE_KEYS.map((key) => {
+        const status  = zones[key];
+        const hasData = status?.intensity != null;
+        const intensity = status?.intensity ?? null;
+        const color   = intensityColor(intensity);
+        const r       = Math.max(1.5, 4 / Math.sqrt(zoom));
+        return (
+          <Marker
+            key={key}
+            coordinates={ZONE_CENTROIDS[key]}
+            onClick={() => onMarkerClick(key)}
+            onMouseEnter={(e) => onMarkerMouseEnter(key, intensity, e.clientX, e.clientY)}
+            onMouseMove={(e) => onMarkerMouseMove(key, intensity, e.clientX, e.clientY)}
+            onMouseLeave={onMarkerMouseLeave}
+            style={{ cursor: "pointer" }}
+          >
+            <g
+              role="button"
+              tabIndex={0}
+              aria-label={`${getZoneName(key)} (${key}), ${!hasData ? "no live data" : `${status!.intensity} grams CO2 per kilowatt-hour`}`}
+              onFocus={(e: FocusEvent<SVGGElement>) => onMarkerFocus(e.currentTarget, key, intensity)}
+              onBlur={onMarkerBlur}
+              onKeyDown={(e: KeyboardEvent<SVGGElement>) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onMarkerClick(key);
+                }
+              }}
+            >
+              {hasData && !reducedMotion && zoom <= 2.5 && (
+                <circle r={r} fill={color} opacity={0}>
+                  <animate attributeName="r" values={`${r};${r * 2.8};${r}`} dur="4s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.22;0;0.22" dur="4s" repeatCount="indefinite" />
+                </circle>
+              )}
+              <circle r={r * 2.2} fill={color} opacity={hasData ? 0.18 : 0.06} />
+              <circle r={r} fill={color} opacity={hasData ? 1 : 0.35} stroke="#040e1c" strokeWidth={0.8} />
+            </g>
+          </Marker>
+        );
+      })}
+    </ZoomableGroup>
+  );
+});
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function ZoneMap() {
@@ -94,13 +197,27 @@ export function ZoneMap() {
   const [retryCount, setRetryCount] = useState(0);
   const [tooltip,  setTooltip]  = useState<TooltipSt | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const tooltipFrameRef = useRef<number | null>(null);
+  const pendingTooltipRef = useRef<TooltipSt | null>(null);
+  const hasPendingTooltipRef = useRef(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReducedMotion(mq.matches);
     const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    if (DEBUG_PERF) {
+      console.log("[ZoneMap] Geography dataset:", GEO_URL);
+    }
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (tooltipFrameRef.current) {
+        cancelAnimationFrame(tooltipFrameRef.current);
+      }
+    };
   }, []);
 
   // ── Data fetch — single bulk request instead of 70+ individual calls ─────
@@ -130,8 +247,11 @@ export function ZoneMap() {
       .then((data: Record<string, number | null>) => {
         if (cancelled) return;
         clearInterval(progressInterval);
+        if (DEBUG_PERF) {
+          console.log("[ZoneMap] Bulk intensity payload keys:", Object.keys(data).length);
+        }
         const mapped: Record<string, ZoneData> = {};
-        for (const key of Object.keys(ZONE_CENTROIDS)) {
+        for (const key of ZONE_KEYS) {
           mapped[key] = { intensity: data[key] ?? null };
         }
         setProgress(100);
@@ -141,6 +261,9 @@ export function ZoneMap() {
       .catch(() => {
         if (cancelled) return;
         clearInterval(progressInterval);
+        if (DEBUG_PERF) {
+          console.log("[ZoneMap] Bulk intensity fetch failed");
+        }
         setZones({});
         setFetchError(true);
         setLoading(false);
@@ -191,7 +314,12 @@ export function ZoneMap() {
   }
 
   const handleMarkerClick = useCallback(
-    (key: string) => router.push(`/z/${encodeURIComponent(key)}`),
+    (key: string) => {
+      if (DEBUG_PERF) {
+        console.log("[ZoneMap] Navigating to zone:", key);
+      }
+      router.push(`/z/${encodeURIComponent(key)}`);
+    },
     [router],
   );
 
@@ -207,6 +335,45 @@ export function ZoneMap() {
     },
     [],
   );
+
+  const flushTooltip = useCallback(() => {
+    tooltipFrameRef.current = null;
+    if (!hasPendingTooltipRef.current) return;
+    setTooltip(pendingTooltipRef.current);
+    pendingTooltipRef.current = null;
+    hasPendingTooltipRef.current = false;
+  }, []);
+
+  const scheduleTooltip = useCallback(
+    (next: TooltipSt | null) => {
+      pendingTooltipRef.current = next;
+      hasPendingTooltipRef.current = true;
+      if (tooltipFrameRef.current == null) {
+        tooltipFrameRef.current = requestAnimationFrame(flushTooltip);
+      }
+    },
+    [flushTooltip],
+  );
+
+  const handleMarkerMouseEnter = useCallback(
+    (key: string, intensity: number | null, x: number, y: number) => {
+      scheduleTooltip({ key, intensity, x, y });
+    },
+    [scheduleTooltip],
+  );
+
+  const handleMarkerMouseMove = useCallback(
+    (key: string, intensity: number | null, x: number, y: number) => {
+      scheduleTooltip({ key, intensity, x, y });
+    },
+    [scheduleTooltip],
+  );
+
+  const handleMarkerMouseLeave = useCallback(() => {
+    scheduleTooltip(null);
+  }, [scheduleTooltip]);
+
+  const mapProjectionConfig = useMemo(() => ({ scale: 153, center: [0, 10] as [number, number] }), []);
 
   return (
     <div className={styles.wrap}>
@@ -246,84 +413,22 @@ export function ZoneMap() {
       <div className={styles.mapContainer}>
         <ComposableMap
           projection="geoEquirectangular"
-          projectionConfig={{ scale: 153, center: [0, 10] }}
+          projectionConfig={mapProjectionConfig}
           style={{ width: "100%", height: "100%", background: "transparent" }}
         >
-          <ZoomableGroup
+          <MapLayers
             zoom={zoom}
             center={center}
-            minZoom={MIN_ZOOM}
-            maxZoom={MAX_ZOOM}
+            zones={zones}
+            reducedMotion={reducedMotion}
             onMoveEnd={handleMoveEnd}
-          >
-            <Graticule stroke="rgba(255,255,255,0.03)" strokeWidth={0.4} />
-            <Geographies geography={GEO_URL}>
-              {({ geographies }) =>
-                geographies.map((geo) => (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    fill="#0d2540"
-                    stroke="#1a4060"
-                    strokeWidth={0.5}
-                    style={{
-                      default: { outline: "none" },
-                      hover:   { outline: "none" },
-                      pressed: { outline: "none" },
-                    }}
-                  />
-                ))
-              }
-            </Geographies>
-
-            {Object.keys(ZONE_CENTROIDS).map((key) => {
-              const status  = zones[key];
-              const hasData = status?.intensity != null;
-              const color   = intensityColor(status?.intensity ?? null);
-              const r       = Math.max(1.5, 4 / Math.sqrt(zoom));
-              return (
-                <Marker
-                  key={key}
-                  coordinates={ZONE_CENTROIDS[key]}
-                  onClick={() => handleMarkerClick(key)}
-                  onMouseEnter={(e) =>
-                    setTooltip({ x: e.clientX, y: e.clientY, key, intensity: status?.intensity ?? null })
-                  }
-                  onMouseMove={(e) =>
-                    setTooltip((p) => (p?.key === key ? { ...p, x: e.clientX, y: e.clientY } : p))
-                  }
-                  onMouseLeave={() => setTooltip(null)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <g
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`${getZoneName(key)} (${key}), ${!hasData ? "no live data" : `${status!.intensity} grams CO2 per kilowatt-hour`}`}
-                    onFocus={(e: FocusEvent<SVGGElement>) => {
-                      showTooltipAtElement(e.currentTarget, key, status?.intensity ?? null);
-                    }}
-                    onBlur={() => setTooltip(null)}
-                    onKeyDown={(e: KeyboardEvent<SVGGElement>) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleMarkerClick(key);
-                      }
-                    }}
-                  >
-                    {/* Subtle pulse ring — live zones only, disabled for prefers-reduced-motion */}
-                    {hasData && !reducedMotion && (
-                      <circle r={r} fill={color} opacity={0}>
-                        <animate attributeName="r" values={`${r};${r * 2.8};${r}`} dur="4s" repeatCount="indefinite" />
-                        <animate attributeName="opacity" values="0.22;0;0.22" dur="4s" repeatCount="indefinite" />
-                      </circle>
-                    )}
-                    <circle r={r * 2.2} fill={color} opacity={hasData ? 0.18 : 0.06} />
-                    <circle r={r} fill={color} opacity={hasData ? 1 : 0.35} stroke="#040e1c" strokeWidth={0.8} />
-                  </g>
-                </Marker>
-              );
-            })}
-          </ZoomableGroup>
+            onMarkerClick={handleMarkerClick}
+            onMarkerMouseEnter={handleMarkerMouseEnter}
+            onMarkerMouseMove={handleMarkerMouseMove}
+            onMarkerMouseLeave={handleMarkerMouseLeave}
+            onMarkerFocus={showTooltipAtElement}
+            onMarkerBlur={handleMarkerMouseLeave}
+          />
         </ComposableMap>
       </div>
 
