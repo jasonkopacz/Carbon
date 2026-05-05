@@ -7,49 +7,105 @@
   overflow: hidden;
 }
 
-.header {
+/* ── Hero header ──────────────────────────────────────────────────────────── */
+.hero {
   position: relative;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.75rem 1.5rem;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 0.875rem 1.5rem;
+  background: transparent;
   border-bottom: 1px solid var(--border);
-  background: rgba(11, 15, 20, 0.92);
-  backdrop-filter: blur(12px);
-  flex-wrap: wrap;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.heroLeft {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-width: 0;
 }
 
 .back {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--accent);
   text-decoration: none;
   flex-shrink: 0;
+  opacity: 0.85;
+  transition: opacity 0.15s;
 }
-.back:hover { opacity: 0.75; }
+.back:hover { opacity: 1; }
 
-.headerTitle {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--fg);
+.heroText {
+  min-width: 0;
+}
+
+.heading {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  letter-spacing: -0.025em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.subheading {
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.7);
+  margin: 0.25rem 0 0;
+  line-height: 1.4;
+}
+
+.heroRight {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
   flex-shrink: 0;
 }
 
+/* ── Live badge ───────────────────────────────────────────────────────────── */
+.live {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #3ddc97;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3ddc97;
+  flex-shrink: 0;
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1;    transform: scale(1);    }
+  50%       { opacity: 0.3; transform: scale(0.82); }
+}
+
+/* ── Legend ───────────────────────────────────────────────────────────────── */
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1rem;
-  margin-left: auto;
+  gap: 0.25rem 0.8rem;
 }
 
 .legendItem {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  color: var(--muted);
+  gap: 0.3rem;
 }
 
 .legendDot {
@@ -59,11 +115,23 @@
   flex-shrink: 0;
 }
 
-/* Main fills all remaining space — map stretches to fill it */
+.legendLabel {
+  font-size: 0.7rem;
+  color: rgba(203, 213, 225, 0.85);
+  white-space: nowrap;
+}
+
+.legendRange {
+  font-size: 0.63rem;
+  color: rgba(148, 163, 184, 0.5);
+  white-space: nowrap;
+}
+
+/* ── Map area ─────────────────────────────────────────────────────────────── */
 .main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 1rem 1.25rem 1.25rem;
+  padding: 0;
   min-height: 0;
 }

@@ -84,13 +84,13 @@ const HOW_IT_WORKS = [
   },
   {
     step: "02",
-    title: "Open the detail page",
+    title: "View the zone's details",
     body: "Click any result to land on its zone page showing live carbon intensity and energy source breakdown.",
   },
   {
     step: "03",
-    title: "Use the data",
-    body: "Plan energy-intensive workloads, shift EV charging, or build carbon-aware applications on top of the API.",
+    title: "See global carbon intensity",
+    body: "View the global carbon intensity map to see how carbon intensity varies across the world.",
   },
 ];
 

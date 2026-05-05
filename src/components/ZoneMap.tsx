@@ -6,14 +6,16 @@ import {
   ComposableMap,
   Geographies,
   Geography,
+  Graticule,
   Marker,
+  Sphere,
   ZoomableGroup,
 } from "react-simple-maps";
 import zoneNamesJson from "@/lib/zone_names.json";
 import { intensityColor, intensityLabel } from "@/lib/intensity";
 import styles from "./ZoneMap.module.css";
 
-const GEO_URL  = "/countries-110m.json";
+const GEO_URL  = "/countries-50m.json";
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 12;
 const ZOOM_STEP = 1.6;
@@ -91,6 +93,15 @@ export function ZoneMap() {
   const [fetchError, setFetchError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [tooltip,  setTooltip]  = useState<TooltipSt | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   // ── Data fetch — single bulk request instead of 70+ individual calls ─────
   useEffect(() => {
@@ -236,7 +247,7 @@ export function ZoneMap() {
         <ComposableMap
           projection="geoEquirectangular"
           projectionConfig={{ scale: 153, center: [0, 10] }}
-          style={{ width: "100%", height: "100%", background: "#060b10" }}
+          style={{ width: "100%", height: "100%", background: "transparent" }}
         >
           <ZoomableGroup
             zoom={zoom}
@@ -244,20 +255,20 @@ export function ZoneMap() {
             minZoom={MIN_ZOOM}
             maxZoom={MAX_ZOOM}
             onMoveEnd={handleMoveEnd}
-            // Allow all events — trackpad pinch, scroll wheel, drag all work
           >
+            <Graticule stroke="rgba(255,255,255,0.03)" strokeWidth={0.4} />
             <Geographies geography={GEO_URL}>
               {({ geographies }) =>
                 geographies.map((geo) => (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
-                    fill="#111827"
-                    stroke="#1e293b"
-                    strokeWidth={0.4}
+                    fill="#0d2540"
+                    stroke="#1a4060"
+                    strokeWidth={0.5}
                     style={{
                       default: { outline: "none" },
-                      hover:   { outline: "none", fill: "#1a2535" },
+                      hover:   { outline: "none" },
                       pressed: { outline: "none" },
                     }}
                   />
@@ -266,9 +277,10 @@ export function ZoneMap() {
             </Geographies>
 
             {Object.keys(ZONE_CENTROIDS).map((key) => {
-              const status = zones[key];
-              const color  = intensityColor(status?.intensity ?? null);
-              const r      = Math.max(1.5, 4 / Math.sqrt(zoom));
+              const status  = zones[key];
+              const hasData = status?.intensity != null;
+              const color   = intensityColor(status?.intensity ?? null);
+              const r       = Math.max(1.5, 4 / Math.sqrt(zoom));
               return (
                 <Marker
                   key={key}
@@ -286,7 +298,7 @@ export function ZoneMap() {
                   <g
                     role="button"
                     tabIndex={0}
-                    aria-label={`${getZoneName(key)} (${key}), ${status?.intensity == null ? "no live data" : `${status.intensity} grams CO2 per kilowatt-hour`}`}
+                    aria-label={`${getZoneName(key)} (${key}), ${!hasData ? "no live data" : `${status!.intensity} grams CO2 per kilowatt-hour`}`}
                     onFocus={(e: FocusEvent<SVGGElement>) => {
                       showTooltipAtElement(e.currentTarget, key, status?.intensity ?? null);
                     }}
@@ -298,8 +310,15 @@ export function ZoneMap() {
                       }
                     }}
                   >
-                    <circle r={r * 2.2} fill={color} opacity={0.15} />
-                    <circle r={r} fill={color} stroke="#060b10" strokeWidth={0.8} />
+                    {/* Subtle pulse ring — live zones only, disabled for prefers-reduced-motion */}
+                    {hasData && !reducedMotion && (
+                      <circle r={r} fill={color} opacity={0}>
+                        <animate attributeName="r" values={`${r};${r * 2.8};${r}`} dur="4s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.22;0;0.22" dur="4s" repeatCount="indefinite" />
+                      </circle>
+                    )}
+                    <circle r={r * 2.2} fill={color} opacity={hasData ? 0.18 : 0.06} />
+                    <circle r={r} fill={color} opacity={hasData ? 1 : 0.35} stroke="#040e1c" strokeWidth={0.8} />
                   </g>
                 </Marker>
               );
